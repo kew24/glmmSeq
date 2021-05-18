@@ -259,6 +259,22 @@ results2 <- glmmSeq(~ Timepoint * EULAR_binary + (1 | PATID),
                   cores = 1)
 ```
 
+
+Additionally we can change the glm family: 
+
+```{r}
+results_poisson <- glmmSeq(~ Timepoint * EULAR_6m + (1 | PATID),
+                  id = "PATID",
+                  countdata = tpm,
+                  metadata = metadata,
+                  dispersion = disp,
+                  removeDuplicatedMeasures = FALSE,
+                  removeSingles=FALSE,
+                  progress=TRUE,
+                  glmerFamily = "poisson",
+                  cores = 1)
+```
+
 ## Outputs
 
 This creates a GlmmSeq object which contains the following slots:
@@ -348,7 +364,7 @@ modColours <- c("Good responder"="dodgerblue3",
                 "Non responder"="seagreen4")
 shapes <- c("Moderate responder"=19, "Good responder"= 17, "Non responder"=18)
 
-pairedPlot(glmmResult=results,
+p1 <- pairedPlot(glmmResult=results_poisson,
            geneName = "IGHV3-23",
            x1Label = "Timepoint",
            x2Label="EULAR_6m",
@@ -360,12 +376,33 @@ pairedPlot(glmmResult=results,
            lineColours = plotColours, 
            modelColours = modColours,
            modelLineColours = modColours,
-           modelSize = 10, 
+           modelSize = 7, 
            fontSize=10,
            x2Offset = 8,
            logTransform=TRUE,
            addViolin = TRUE,
-           pairedOnly = FALSE) 
+           pairedOnly = FALSE) + labs(title="Poisson", y="IGHV3-23")
+
+p2 <- pairedPlot(glmmResult=results,
+           geneName = "IGHV3-23",
+           x1Label = "Timepoint",
+           x2Label="EULAR_6m",
+           xTitle="Time",
+           IDColumn = "PATID",
+           graphics = "ggplot",
+           colours = plotColours,
+           shapes = shapes,
+           lineColours = plotColours, 
+           modelColours = modColours,
+           modelLineColours = modColours,
+           modelSize = 7, 
+           fontSize=10,
+           x2Offset = 8,
+           logTransform=TRUE,
+           addViolin = TRUE,
+           pairedOnly = FALSE) + labs(title="Negative Binomial", y="IGHV3-23")
+
+ggpubr::ggarrange(p1, p2, ncol=2)
 ```
 
 Or using base graphics, with or without the model fit overlaid:
@@ -374,7 +411,7 @@ Or using base graphics, with or without the model fit overlaid:
 oldpar <- par()
 par(mfrow=c(1, 2))
 
-p1 = pairedPlot(glmmResult=results2,
+p1 <- pairedPlot(glmmResult=results2,
                 geneName = "FGF14",
                 x1Label = "Timepoint",
                 x2Label="EULAR_binary",
@@ -387,7 +424,7 @@ p1 = pairedPlot(glmmResult=results2,
                 modelLineColours = "black",
                 modelSize = 2)
 
-p2 = pairedPlot(glmmResult=results,
+p2 <- pairedPlot(glmmResult=results,
                 geneName = "EMILIN3",
                 x1Label = "Timepoint",
                 x2Label="EULAR_6m",
