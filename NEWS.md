@@ -6,6 +6,7 @@ News
 
 ##### Features
 * Add glmerFamily option to glmmSeq and glmmGene which changes the glm family
+* Enable users to fit glm as opposed to glmer in glmmSeq and glmmGene using the glmOnly parameter - no random effects in model.  
 
 ##### Bug Fixes
 * Fix colours in pairedPlots and modelPlots

@@ -31,22 +31,25 @@ setClass("GlmmSeq", slots = list(
 #' Glmm for sequencing results
 #'
 #' @param modelFormula the model formula. For more information of formula
-#' structure see \code{\link[lme4:glmer]{lme4::glmer}}
+#' structure see \code{\link[lme4:glmer]{glmer}}
 #' @param countdata the sequencing count data
 #' @param metadata a data frame of sample information
 #' @param id Column name in metadata which contains the sample IDs to be used
 #' in pairing samples
-#' @param dispersion a numeric vector of gene dispersion for the glmerFamily. If
-#' glmerFamily does not used dispersion, this can be set as NA. 
+#' @param dispersion a numeric vector of gene dispersion for the family. If
+#' family does not use dispersion, this can be set as NA. 
 #' @param sizeFactors size factors (default = NULL). If provided the glmer 
 #' offset is set to log(sizeFactors). For more information see
-#'  \code{\link[lme4:glmer]{lme4::glmer}}
+#'  \code{\link[lme4:glmer]{glmer}}
 #' @param reducedFormula Reduced design formula (default = "")
 #' @param modelData Expanded design matrix
+#' @param glmOnly Logical whether to only run 
+#' \code{\link[stats:glm]{stats::glm}} (TRUE) instead of 
+#' \code{\link[lme4:glmer]{lme4::glmer}} (FALSE). Default is FALSE. 
 #' @param control the glmer control (default = glmerControl(optimizer = 
 #' "bobyqa")). For more information see
 #' \code{\link[lme4:glmerControl]{lme4::glmerControl}}.
-#' @param glmerFamily The GLM family, see 
+#' @param family The GLM family, see 
 #' \code{\link[stats:glm]{stats::glm}} and 
 #' \code{\link[stats:family]{stats::family}}. If NULL 
 #' \code{\link[MASS:negative.binomial]{MASS::negative.binomial}} is used. 
@@ -98,8 +101,9 @@ glmmSeq <- function(modelFormula,
                     sizeFactors = NULL,
                     reducedFormula = "",
                     modelData = NULL,
+                    glmOnly = FALSE,
                     control = glmerControl(optimizer = "bobyqa"),
-                    glmerFamily = NULL, 
+                    family = NULL, 
                     cores = 1,
                     removeDuplicatedMeasures = FALSE,
                     removeSingles = FALSE,
@@ -110,8 +114,15 @@ glmmSeq <- function(modelFormula,
                     ...) {
   
   # Catch errors
-  if (length(findbars(modelFormula)) == 0) {
-    stop("No random effects terms specified in formula")
+  if (! glmOnly & length(findbars(modelFormula)) == 0) {
+    warning(paste("glmOnly is FALSE but no random effects specified in", 
+                  "formula. Running glm instead"))
+    glmOnly <- TRUE
+  } 
+  if (glmOnly & length(findbars(modelFormula)) > 0) {
+    warning(paste("glmOnly is TRUE but random effects specified in formula.", 
+                  "Running glmer instead"))
+    glmOnly <- FALSE
   }
   if (ncol(countdata) != nrow(metadata)) {
     stop("countdata columns different size to metadata rows")
@@ -119,11 +130,11 @@ glmmSeq <- function(modelFormula,
   if (!is.null(sizeFactors) & ncol(countdata) != length(sizeFactors)) {
     stop("Different sizeFactors length")
   }
-  if(is.null(glmerFamily)){
+  if(is.null(family)){
     if (! all(rownames(countdata) %in% names(dispersion), nrow(countdata))) {
       stop("Dispersion length must match nrow in countdata")
     }
-    glmerFamily <- MASS::negative.binomial(theta = 1/dispersion)
+    family <- MASS::negative.binomial(theta = 1/dispersion)
   }
   if (! is.numeric(zeroCount)) stop("zeroCount must be numeric")
   if (zeroCount < 0) stop("zeroCount must be > = 0")
@@ -201,56 +212,76 @@ glmmSeq <- function(modelFormula,
   
   start <- Sys.time()
   fullList <- lapply(rownames(countdata), function(i) {
-    glmerFamilyInput <- glmerFamily 
-    if(length(glmerFamily$family) > 1) {
-      glmerFamilyInput$family <- glmerFamilyInput$family[
+    familyInput <- family 
+    if(length(familyInput$family) > 1) {
+      familyInput$family <- familyInput$family[
         which(rownames(countdata) == i)]
     }
-    list(y = countdata[i, ], family = glmerFamilyInput)
+    list(y = countdata[i, ], family = familyInput)
   })
   
   # For each gene perform a fit
+  if(glmOnly) {
+    functionUsed <- glmApply 
+    if("glmerControl" %in% class(control)) {
+      control <- list()
+      message("glmer control passed into glm, using control <- list() instead")
+    }
+  } else {
+    functionUsed <- glmerApply
+    if(! "glmerControl" %in% class(control)) {
+      control <- glmerControl()
+      message(paste("Control not of class 'glmer control', using control <-", 
+                    "glmerControl() instead"))
+    }
+  }
+  
   if (Sys.info()["sysname"] == "Windows") {
     cl <- makeCluster(cores)
-    clusterExport(cl, varlist = c("glmerApply", "fullList", "fullFormula",
+    clusterExport(cl, varlist = c("functionUsed", 
+                                  "fullList", "fullFormula",
                                   "subsetMetadata", "control", "modelData",
                                   "offset", "designMatrix", ...),
                   envir = environment())
     if (progress) {
       resultList <- pblapply(fullList, function(geneList) {
-        glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
-                   control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, ...)
+        functionUsed(geneList, fullFormula = fullFormula, data = subsetMetadata,
+                     control = control, modelData = modelData, offset = offset,
+                     designMatrix = designMatrix, ...)
       }, cl = cl)
     } else {
       resultList <- parLapply(cl = cl, fullList, function(geneList) {
-        glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
-                   control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, ...)
+        functionUsed(geneList, fullFormula = fullFormula, data = subsetMetadata,
+                     control = control, modelData = modelData, offset = offset,
+                     designMatrix = designMatrix, ...)
       })
     }
     stopCluster(cl)
   } else{
     if (progress) {
       resultList <- pbmclapply(fullList, function(geneList) {
-        glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
-                   control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, ...)
+        functionUsed(geneList, fullFormula = fullFormula, data = subsetMetadata,
+                     control = control, modelData = modelData, offset = offset,
+                     designMatrix = designMatrix)#, ...)
       }, mc.cores = cores)
-      if ("value" %in% names(resultList)) resultList <- resultList$value
     } else {
       resultList <- mclapply(fullList, function(geneList) {
-        glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
-                   control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, ...)
+        functionUsed(geneList, fullFormula = fullFormula, data = subsetMetadata,
+                     control = control, modelData = modelData, offset = offset,
+                     designMatrix = designMatrix, ...)
       }, mc.cores = cores)
     }
+  }
+  if ("value" %in% names(resultList)) {
+    warning(paste0("Some warnings arising in generalized linear models: '", 
+                   trimws(resultList$warning), "'"))
+    resultList <- resultList$value
   }
   if(returnList) return(resultList)
   
   # Print timing if verbose
-  end <- Sys.time()
-  if (verbose) print(end - start)
+  time <- Sys.time() - start
+  if (verbose) cat("\nCompleted in", time, units(time), '\n')
   
   # Output
   names(resultList) <- rownames(countdata)
@@ -258,7 +289,7 @@ glmmSeq <- function(modelFormula,
   if (length(which(noErr)) == 0) { 
     stop("All genes returned an error. Check sufficient data in each group")
   }
-  
+
   nCheat <- resultList[noErr][[1]]$predict
   outputPredict <- t(vapply(resultList[noErr], function(x) x$predict,
                             FUN.VALUE = rep(1, length(nCheat))))
@@ -267,23 +298,22 @@ glmmSeq <- function(modelFormula,
   colnames(outputPredict) <- c(paste0("y_", outLabels),
                                paste0("LCI_", outLabels),
                                paste0("UCI_", outLabels))
-  
+
   if (sum(!noErr) != 0) {
     if (verbose) cat(paste0("Errors in ", sum(!noErr), " gene(s): ",
                             paste0(names(noErr)[! noErr], collapse = ", ")))
     outputErrors <- vapply(resultList[!noErr], function(x) {x$tryErrors},
                            FUN.VALUE = c("test"))
   } else {outputErrors <- c("No errors")}
-  
   optInfo <- t(vapply(resultList[noErr], function(x) {
-    setNames(x$optinfo, c("Singular", "Conv"))
+    setNames(x$optinfo, names(x$optinfo))
   }, FUN.VALUE = c(1, 1)))
-  
+
   nCheat <- resultList[noErr][[1]]$stats
   s <- data.frame(t(vapply(resultList[noErr], function(x) {x$stats},
-                           FUN.VALUE = rep(1, length(nCheat)))))
-  if(! is.na(dispersion)) s$Dispersion <- dispersion[rownames(s)]
-  
+                           FUN.VALUE = rep(1, length(nCheat)))), 
+                  check.names = FALSE)
+  if(length(dispersion) > 1) s$Dispersion <- dispersion[rownames(s)]
 
   # Create GlmmSeq object with results
   new("GlmmSeq",
@@ -368,6 +398,70 @@ glmerApply <- function(geneList,
     return(list(stats = c(stats, fixedEffects, waldtest),
                 predict = predictdf,
                 optinfo = c(singular, conv),
+                tryErrors = "") )
+  } else {
+    return(list(stats = NA, predict = NA, optinfo = NA, tryErrors = fit[1]))
+  }
+}
+
+
+
+#' Fit a glm model for an individual gene (no random effect)
+#'
+#' @param geneList List with gene expression and optional dispersion
+#' @param fullFormula the model formula. For more information of formula
+#' structure see \code{\link[stats:glm]{stats::glm}}
+#' @param modelData Expanded design matrix
+#' @param data The sample data or metadata.
+#' @param designMatrix The design matrix
+#' @param control the glm control (default = list()). For more information see
+#' \code{\link[stats:glm]{stats::glm()}}.
+#' @param offset this can be used to specify an a priori known component to be
+#'  included in the linear predictor during fitting. For more information see
+#'  \code{\link[stats:glm]{stats::glm()}}.
+#' @param ... Other parameters to pass to
+#' \code{\link[stats:glm]{stats::glm()}}
+#' @return Returns a GlmmSeq object with results for gene-wise general linear
+#' mixed models
+#' @importFrom MASS negative.binomial
+#' @importFrom stats glm AIC complete.cases logLik reshape terms 
+#' vcov predict update.formula model.matrix predict setNames
+#' @keywords internal
+#' @export
+glmApply <- function(geneList,
+                     fullFormula,
+                     data,
+                     control,
+                     modelData,
+                     designMatrix,
+                     offset,
+                     ...) {
+  data[, "count"] <- as.numeric(geneList$y)
+
+  fit <- try(suppressMessages(
+    glm(fullFormula, data = data, control = control, offset = offset,
+        family = geneList$family, ...)), silent = TRUE)
+  
+  if (class(fit) != "try-error") {
+    stats <- setNames(c(AIC(fit), as.numeric(logLik(fit)), fit$deviance),
+                      c("AIC", "logLik", "deviance"))
+    fixedEffects <- fit$coefficients
+    names(fixedEffects) <- paste0(names(fixedEffects), "_Estimate")
+    pValues <- summary(fit)$coefficients[, "Pr(>|t|)"]
+    names(pValues) <- paste0("P_", names(pValues))
+    
+    newY <- predict(fit, newdata = modelData, re.form = NA)
+    a <- designMatrix %*% vcov(fit)
+    b <- as.matrix(a %*% t(designMatrix))
+    predVar <- diag(b)
+    newSE <- sqrt(predVar)
+    newLCI <- exp(newY - newSE * 1.96)
+    newUCI <- exp(newY + newSE * 1.96)
+    predictdf <- c(exp(newY), newLCI, newUCI)
+    rm(fit, data)
+    return(list(stats = c(stats, fixedEffects, pValues),
+                predict = predictdf,
+                optinfo = c("boundary"=fit$boundary, "converged"=fit$converged),
                 tryErrors = "") )
   } else {
     return(list(stats = NA, predict = NA, optinfo = NA, tryErrors = fit[1]))

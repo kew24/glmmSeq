@@ -44,6 +44,7 @@
 #' scale_x_continuous aes_string annotate margin element_text rel
 #' @importFrom graphics arrows axis lines mtext plot segments points boxplot
 #' @importFrom gghalves geom_half_violin
+#' @importFrom lme4 findbars
 #' @export
 #' @examples
 #' data(PEAC_minimal_load)
@@ -99,6 +100,10 @@ pairedPlot <- function(glmmResult,
   if(class(alpha) != "numeric" | alpha > 1 | alpha < 0) {
     stop("alpha must be a numer between 1 and 0")
   }
+  if(is.null(findbars(glmmResult@formula))){
+    stop(paste("This looks like a glm output. fcPlots can only be run with", 
+               "glmer models. "))
+  }
   
   
   # For outputs from glmmGene
@@ -125,7 +130,9 @@ pairedPlot <- function(glmmResult,
       stop("x2Label must be a column name in glmmResult@modelData")
     }
     if(! IDColumn %in% colnames(glmmResult@metadata)) {
-      stop("IDColumn must be a column name in glmmResult@metadata")
+      stop(paste("IDColumn must be a column name in glmmResult@metadata.", 
+                 "If model was build using glm, try using modelPlot()", 
+                 "instead."))
     }
     if(! geneName %in% rownames(glmmResult@countdata)){
       stop("geneName must be in rownames(glmmResult@countdata)")
@@ -277,7 +284,7 @@ pairedPlot <- function(glmmResult,
   } else{ # Generate ggplot plots
     df_long$x1Factors <- factor(df_long$x1Factors)
     df_long$x2 <- factor(df_long$x2)
-
+    
     p <- ggplot(df_long, 
                 aes_string(x="x1Factors", y="geneExp", group="id",
                            shape=x2Label, color=x2Label)) +
@@ -361,7 +368,7 @@ pairedPlot <- function(glmmResult,
     }
     
     if(logTransform) p <- p + scale_y_continuous(trans='log10')
-
+    
     p <- p + labs(subtitle= bquote(
       paste("P"[.(x1Label)]*"=", .(pval[1]),
             ", P"[.(x2Label)]*"=", .(pval[2]),

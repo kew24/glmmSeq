@@ -13,7 +13,8 @@
 #' @param useAdjusted whether to use adjusted pvalues
 #' (must have q_ columns in glmmResult). Default = FALSE
 #' @param plotCutoff Which probes to include on plot by significance cut-off
-#' (default = 1, for all markers)
+#' (default = 1, for all markers). If any Chi-Sq p-values are significant then 
+#' the probes are included
 #' @param graphics Graphics system to use: "ggplot" or "plotly"
 #' @param fontSize Font size
 #' @param labelFontSize Font size for labels
@@ -24,6 +25,7 @@
 #' @importFrom plotly layout config plot_ly
 #' @importFrom ggplot2 ggplot geom_point theme_minimal scale_color_manual labs
 #' theme element_rect geom_vline unit
+#' @importFrom lme4 findbars
 #' @keywords hplot
 #' @export
 #' @examples
@@ -64,6 +66,11 @@ fcPlot <- function(glmmResult,
                    colours = c("grey", "goldenrod1", "red", "blue"),
                    verbose = FALSE){
   
+  if(is.null(findbars(glmmResult@formula))){
+    stop(paste("This looks like a glm output. fcPlots can only be run with", 
+               "glmer models. "))
+  }
+  
   # Extract the data
   predict <- glmmResult@predict
   stats <- glmmResult@stats
@@ -71,19 +78,19 @@ fcPlot <- function(glmmResult,
   modelData <- glmmResult@modelData
   outLabels <- apply(modelData, 1, function(x) paste(x, collapse = "_"))
   modelData$y <- paste0("y_", outLabels)
-
+  
   # Set up the plotting data
   plotData <- data.frame(
     cbind(predict[, paste0("y_", outLabels)], stats),
     check.names = FALSE)
-
+  
   if (length(grep(adj, colnames(plotData))) < 3) {
     stop(paste("there must be at least 3", adj, "columns"))
   }
   if (! all(labels %in% rownames(plotData))) {
     stop("labels must be in rownames(glmmResult@predict)")
   }
-
+  
   # Define the comparisons
   if (is.null(x1Values)) {
     x1Values <-  levels(factor(modelData[, x1Label]))[1:2]
@@ -92,18 +99,18 @@ fcPlot <- function(glmmResult,
     x2Values <-  levels(factor(modelData[, x2Label]))[1:2]
   }
   if (! all(x1Values %in% levels(factor(modelData[, x1Label]))) |
-     length(x1Values) != 2) {
+      length(x1Values) != 2) {
     stop("x1Values must be a vector of two levels in x1Label")
   }
   if (! all(x2Values %in% levels(factor(modelData[, x2Label]))) |
-     length(x2Values) != 2) {
+      length(x2Values) != 2) {
     stop("x2Values must be a vector of two levels in x2Label")
   }
   xCols <- modelData$y[modelData[, x2Label] == x2Values[1] &
                          modelData[, x1Label] %in% x1Values]
   yCols <- modelData$y[modelData[, x2Label] == x2Values[2] &
                          modelData[, x1Label] %in% x1Values]
-
+  
   plotData$x <- log2(plotData[, xCols[1]]+1) - log2(plotData[, xCols[2]]+1)
   plotData$y <- log2(plotData[, yCols[1]]+1) - log2(plotData[, yCols[2]]+1)
   plotData$maxGroup <- ifelse(abs(plotData$x) > abs(plotData$y),
@@ -111,37 +118,40 @@ fcPlot <- function(glmmResult,
                               x2Values[2])
   cols <- gsub("P_", "", colnames(plotData)[grepl("P_", colnames(plotData))])
   cols <- cols[grepl(":", cols)]
-
+  if(! length(cols)) {
+    stop(paste0("No single P_", x1Label, ":", x2Label, "column. "))
+  }
+  
   # Set up the colour code
   colLevels <- c('Not Significant', paste0(adj, x1Label, ' < ', pCutoff),
                  paste0(adj, x1Label, ":", x2Label, " < ", pCutoff,
                         " (biggest FC in ", x2Values[2], ")"),
                  paste0(adj, x1Label, ":", x2Label, " < ", pCutoff,
                         " (biggest FC in ", x2Values[1], ")"))
-  plotData$col <- colLevels[1]
+  plotData$col <- as.character(colLevels[1])
   plotData$col[plotData[, paste0(adj, cols)] < pCutoff &
                  ! is.na(plotData[, paste0(adj, x1Label)])] <- colLevels[2]
-
+  
   plotData$col[plotData[, paste0(adj,cols)] < pCutoff &
                  !is.na(plotData[, paste0(adj, x2Label)])] <- colLevels[3]
-
+  
   plotData$col[plotData$col == colLevels[3] &
                  plotData$maxGroup == x2Values[1]] <- colLevels[4]
-
+  
   plotData$col[is.na(plotData$col)] <- 'Not Significant'
   plotData$col <- factor(plotData$col, levels = colLevels)
-
+  
   # Genes passing the cutoff
   plotGenes <- apply(plotData[, grep(adj, colnames(plotData))], 1, function(x) {
     any(x < plotCutoff)
   })
   plotData <- plotData[plotGenes, ]
-
+  
   if (verbose) {
     cat(paste("Significance\n"))
     print(table(plotData$col))
   }
-
+  
   # Set up annotations for genes to be labelled
   if (any(! labels %in% rownames(plotData))) {
     warning(paste(
@@ -163,7 +173,7 @@ fcPlot <- function(glmmResult,
            xanchor = "auto", yanchor = "auto")
     })
   } else {annot <- list()}
-
+  
   # GGplot
   if (graphics == "ggplot") {
     plotData <- plotData[order(plotData$col), ]
@@ -173,11 +183,11 @@ fcPlot <- function(glmmResult,
       theme_minimal() +
       scale_color_manual(values = colours, breaks = colLevels, name = "") +
       labs(x = bquote(paste("log"[2], "Fold Change ", .(x1Values[1]), " vs ",
-                          .(x1Values[2]), " (", .(x2Label), " = ",
-                          .(x2Values[1]), ")")),
+                            .(x1Values[2]), " (", .(x2Label), " = ",
+                            .(x2Values[1]), ")")),
            y = bquote(paste("log"[2], "Fold Change ", .(x1Values[1]), " vs ",
-                          .(x1Values[2]), " (", .(x2Label), " = ",
-                          .(x2Values[2]), ")")),
+                            .(x1Values[2]), " (", .(x2Label), " = ",
+                            .(x2Values[2]), ")")),
            title = "") +
       theme(legend.position = c(0, 1),
             text = element_text(size = fontSize),
@@ -188,7 +198,7 @@ fcPlot <- function(glmmResult,
                y = unlist(lapply(annot, function(x) x$y)), vjust = 1,
                size = labelFontSize,
                label = unlist(lapply(annot, function(x) x$text)))
-
+    
     # Plotly
   }else if (graphics == "plotly") {
     plotData <- plotData[order(plotData$col), ]
@@ -200,13 +210,13 @@ fcPlot <- function(glmmResult,
                  text = rownames(plotData), hoverinfo = 'text') %>%
       layout(annotations = annot,
              xaxis = list(title = paste0("log<sub>2</sub>Fold change ",
-                                     x1Values[1], " vs ", x1Values[2],
-                                     " (", x2Label, " = ", x2Values[1], ")"),
-                        color = 'black'),
+                                         x1Values[1], " vs ", x1Values[2],
+                                         " (", x2Label, " = ", x2Values[1], ")"),
+                          color = 'black'),
              yaxis = list(title = paste0("log<sub>2</sub>Fold change ",
-                                     x1Values[1], " vs ", x1Values[2],
-                                     " (", x2Label, " = ", x2Values[2], ")"),
-                        color = 'black'),
+                                         x1Values[1], " vs ", x1Values[2],
+                                         " (", x2Label, " = ", x2Values[2], ")"),
+                          color = 'black'),
              font = list(size = fontSize),
              legend = list(x = 0, y = 1, font = list(color = 'black'))) %>%
       config(edits = list(annotationPosition = TRUE,
@@ -214,6 +224,6 @@ fcPlot <- function(glmmResult,
                           annotationText = TRUE),
              toImageButtonOptions = list(format = "svg"))
   } else stop("graphics must be 'ggplot' or 'plotly'")
-
+  
   return(p)
 }

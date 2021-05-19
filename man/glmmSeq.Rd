@@ -13,8 +13,9 @@ glmmSeq(
   sizeFactors = NULL,
   reducedFormula = "",
   modelData = NULL,
+  glmOnly = FALSE,
   control = glmerControl(optimizer = "bobyqa"),
-  glmerFamily = NULL,
+  family = NULL,
   cores = 1,
   removeDuplicatedMeasures = FALSE,
   removeSingles = FALSE,
@@ -27,7 +28,7 @@ glmmSeq(
 }
 \arguments{
 \item{modelFormula}{the model formula. For more information of formula
-structure see \code{\link[lme4:glmer]{lme4::glmer}}}
+structure see \code{\link[lme4:glmer]{glmer}}}
 
 \item{countdata}{the sequencing count data}
 
@@ -36,22 +37,26 @@ structure see \code{\link[lme4:glmer]{lme4::glmer}}}
 \item{id}{Column name in metadata which contains the sample IDs to be used
 in pairing samples}
 
-\item{dispersion}{a numeric vector of gene dispersion for the glmerFamily. If
-glmerFamily does not used dispersion, this can be set as NA.}
+\item{dispersion}{a numeric vector of gene dispersion for the family. If
+family does not use dispersion, this can be set as NA.}
 
 \item{sizeFactors}{size factors (default = NULL). If provided the glmer
 offset is set to log(sizeFactors). For more information see
-\code{\link[lme4:glmer]{lme4::glmer}}}
+\code{\link[lme4:glmer]{glmer}}}
 
 \item{reducedFormula}{Reduced design formula (default = "")}
 
 \item{modelData}{Expanded design matrix}
 
+\item{glmOnly}{Logical whether to only run
+\code{\link[stats:glm]{stats::glm}} (TRUE) instead of
+\code{\link[lme4:glmer]{lme4::glmer}} (FALSE). Default is FALSE.}
+
 \item{control}{the glmer control (default = glmerControl(optimizer =
 "bobyqa")). For more information see
 \code{\link[lme4:glmerControl]{lme4::glmerControl}}.}
 
-\item{glmerFamily}{The GLM family, see
+\item{family}{The GLM family, see
 \code{\link[stats:glm]{stats::glm}} and
 \code{\link[stats:family]{stats::family}}. If NULL
 \code{\link[MASS:negative.binomial]{MASS::negative.binomial}} is used.}

@@ -240,9 +240,28 @@ results <- glmmSeq(modelFormula = ~ Timepoint * EULAR_6m + (1 | PATID),
                   countdata = tpm,
                   metadata = metadata,
                   dispersion = disp,
-                  glmerFamily = NULL,
+                  family = NULL,
                   removeDuplicatedMeasures = FALSE,
                   removeSingles=FALSE,
+                  progress=TRUE,
+                  cores = 1)
+```
+
+Or using glm only, as opposed to glmer:
+
+```{r}
+results_glm <- glmmSeq(modelFormula = ~ Timepoint * EULAR_6m,
+                  id = "PATID",
+                  countdata = tpm,
+                  metadata = metadata,
+                  dispersion = disp,
+                  sizeFactors=NULL,
+                  family = NULL,
+                  control=list(),
+                  glmOnly = TRUE, 
+                  removeDuplicatedMeasures = FALSE,
+                  removeSingles=FALSE,
+                  returnList=FALSE,
                   progress=TRUE,
                   cores = 1)
 ```
@@ -272,7 +291,7 @@ results_poisson <- glmmSeq(~ Timepoint * EULAR_6m + (1 | PATID),
                   removeDuplicatedMeasures = FALSE,
                   removeSingles=FALSE,
                   progress=TRUE,
-                  glmerFamily = poisson(),
+                  family = poisson(),
                   cores = 1)
 ```
 
@@ -384,7 +403,7 @@ p1 <- pairedPlot(glmmResult=results_poisson,
            addViolin = TRUE,
            pairedOnly = FALSE) + labs(title="Poisson", y="IGHV3-23")
 
-p2 <- pairedPlot(glmmResult=results,
+p2 <- pairedPlot(glmmResult=results_glm,
            geneName = "IGHV3-23",
            x1Label = "Timepoint",
            x2Label="EULAR_6m",
@@ -453,21 +472,23 @@ p1 <- modelPlot(results,
                 xTitle="Time",
                 fontSize=8,
                 x2Offset=6,
-                overlap=FALSE,
+                overlap=TRUE,
                 graphics="ggplot",
-                colours = plotColours)
+                colours = plotColours) + 
+  labs(title="ADAM12 with random effects (Chi-Sq stats)")
 
-p2 <- modelPlot(results,
+p2 <- modelPlot(results_glm,
                 "ADAM12",
                 x1Label="Timepoint",
                 x2Label="EULAR_6m",
                 xTitle="Time",
                 fontSize=8,
                 x2Offset=1,
-                addErrorbars = FALSE,
+                addErrorbars = TRUE,
                 overlap=TRUE,
                 graphics="ggplot",
-                colours = plotColours)
+                colours = plotColours) + 
+  labs(title="ADAM12 without random effects (t stats)")
 
 ggarrange(p1, p2, ncol=2, common.legend = T, legend="bottom")
 ```
@@ -603,8 +624,10 @@ Statistical software used in this package:
 
 1. [lme4](https://dx.doi.org/10.18637/jss.v067.i01): Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1-48. doi: 10.18637/jss.v067.i01.
 
-2. [car](https://socialsciences.mcmaster.ca/jfox/Books/Companion/): John Fox and Sanford Weisberg (2019). An {R} Companion to Applied Regression, Third Edition. Thousand Oaks CA: Sage. URL: https://socialsciences.mcmaster.ca/jfox/Books/Companion/
-  
-3. [MASS](https://www.stats.ox.ac.uk/pub/MASS4/VR4stat.pdf): Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0
+2. [stats](https://dx.doi.org/10.18637/jss.v067.i01): Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1-48. doi: 10.18637/jss.v067.i01.
 
-4. [qvalue](https://github.com/StoreyLab/qvalue): John D. Storey, Andrew J. Bass, Alan Dabney and David Robinson (2020). qvalue: Q-value estimation for false discovery rate control. R package version 2.22.0. https://github.com/StoreyLab/qvalue
+3. [car](https://socialsciences.mcmaster.ca/jfox/Books/Companion/): John Fox and Sanford Weisberg (2019). An {R} Companion to Applied Regression, Third Edition. Thousand Oaks CA: Sage. URL: https://socialsciences.mcmaster.ca/jfox/Books/Companion/
+  
+4. [MASS](https://www.stats.ox.ac.uk/pub/MASS4/VR4stat.pdf): Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0
+
+5. [qvalue](https://github.com/StoreyLab/qvalue): John D. Storey, Andrew J. Bass, Alan Dabney and David Robinson (2020). qvalue: Q-value estimation for false discovery rate control. R package version 2.22.0. https://github.com/StoreyLab/qvalue
