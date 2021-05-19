@@ -235,11 +235,12 @@ this analysis can take some time, with 2 cores:
 - All ~20000 genes takes about 9 mins
 
 ```{r, warning=FALSE}
-results <- glmmSeq(~ Timepoint * EULAR_6m + (1 | PATID),
+results <- glmmSeq(modelFormula = ~ Timepoint * EULAR_6m + (1 | PATID),
                   id = "PATID",
                   countdata = tpm,
                   metadata = metadata,
                   dispersion = disp,
+                  glmerFamily = NULL,
                   removeDuplicatedMeasures = FALSE,
                   removeSingles=FALSE,
                   progress=TRUE,
@@ -267,11 +268,11 @@ results_poisson <- glmmSeq(~ Timepoint * EULAR_6m + (1 | PATID),
                   id = "PATID",
                   countdata = tpm,
                   metadata = metadata,
-                  dispersion = disp,
+                  dispersion = NA,
                   removeDuplicatedMeasures = FALSE,
                   removeSingles=FALSE,
                   progress=TRUE,
-                  glmerFamily = "poisson",
+                  glmerFamily = poisson(),
                   cores = 1)
 ```
 

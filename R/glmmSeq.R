@@ -36,7 +36,8 @@ setClass("GlmmSeq", slots = list(
 #' @param metadata a data frame of sample information
 #' @param id Column name in metadata which contains the sample IDs to be used
 #' in pairing samples
-#' @param dispersion a numeric vector of gene dispersion
+#' @param dispersion a numeric vector of gene dispersion for the glmerFamily. If
+#' glmerFamily does not used dispersion, this can be set as NA. 
 #' @param sizeFactors size factors (default = NULL). If provided the glmer 
 #' offset is set to log(sizeFactors). For more information see
 #'  \code{\link[lme4:glmer]{lme4::glmer}}
@@ -118,6 +119,12 @@ glmmSeq <- function(modelFormula,
   if (!is.null(sizeFactors) & ncol(countdata) != length(sizeFactors)) {
     stop("Different sizeFactors length")
   }
+  if(is.null(glmerFamily)){
+    if (! all(rownames(countdata) %in% names(dispersion), nrow(countdata))) {
+      stop("Dispersion length must match nrow in countdata")
+    }
+    glmerFamily <- MASS::negative.binomial(theta = 1/dispersion)
+  }
   if (! is.numeric(zeroCount)) stop("zeroCount must be numeric")
   if (zeroCount < 0) stop("zeroCount must be > = 0")
   if (zeroCount > 0) countdata[countdata == 0] <- zeroCount
@@ -172,9 +179,6 @@ glmmSeq <- function(modelFormula,
                    FUN.VALUE = TRUE, ncol(countdata)))) {
     stop("Alignment error: metadata rownames must match countdata colnames")
   }
-  if (! all(rownames(countdata) %in% names(dispersion), nrow(countdata))) {
-    stop("Dispersion length must match nrow in countdata")
-  }
   
   if (!is.null(sizeFactors)) offset <- log(sizeFactors) else offset <- NULL
   if (verbose) cat(paste0("\nn = ", length(ids), " samples, ",
@@ -197,7 +201,12 @@ glmmSeq <- function(modelFormula,
   
   start <- Sys.time()
   fullList <- lapply(rownames(countdata), function(i) {
-    list(y = countdata[i, ], dispersion = dispersion[i])
+    glmerFamilyInput <- glmerFamily 
+    if(length(glmerFamily$family) > 1) {
+      glmerFamilyInput$family <- glmerFamilyInput$family[
+        which(rownames(countdata) == i)]
+    }
+    list(y = countdata[i, ], family = glmerFamilyInput)
   })
   
   # For each gene perform a fit
@@ -205,19 +214,19 @@ glmmSeq <- function(modelFormula,
     cl <- makeCluster(cores)
     clusterExport(cl, varlist = c("glmerApply", "fullList", "fullFormula",
                                   "subsetMetadata", "control", "modelData",
-                                  "offset", "designMatrix", "glmerFamily", ...),
+                                  "offset", "designMatrix", ...),
                   envir = environment())
     if (progress) {
       resultList <- pblapply(fullList, function(geneList) {
         glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
                    control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, glmerFamily = glmerFamily, ...)
+                   designMatrix = designMatrix, ...)
       }, cl = cl)
     } else {
       resultList <- parLapply(cl = cl, fullList, function(geneList) {
         glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
                    control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, glmerFamily = glmerFamily, ...)
+                   designMatrix = designMatrix, ...)
       })
     }
     stopCluster(cl)
@@ -226,14 +235,14 @@ glmmSeq <- function(modelFormula,
       resultList <- pbmclapply(fullList, function(geneList) {
         glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
                    control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, glmerFamily = glmerFamily, ...)
+                   designMatrix = designMatrix, ...)
       }, mc.cores = cores)
       if ("value" %in% names(resultList)) resultList <- resultList$value
     } else {
       resultList <- mclapply(fullList, function(geneList) {
         glmerApply(geneList, fullFormula = fullFormula, data = subsetMetadata,
                    control = control, modelData = modelData, offset = offset,
-                   designMatrix = designMatrix, glmerFamily = glmerFamily, ...)
+                   designMatrix = designMatrix, ...)
       }, mc.cores = cores)
     }
   }
@@ -260,7 +269,7 @@ glmmSeq <- function(modelFormula,
                                paste0("UCI_", outLabels))
   
   if (sum(!noErr) != 0) {
-    if (verbose) cat(paste0("Errors in ", sum(!noErr), " gene(s):",
+    if (verbose) cat(paste0("Errors in ", sum(!noErr), " gene(s): ",
                             paste0(names(noErr)[! noErr], collapse = ", ")))
     outputErrors <- vapply(resultList[!noErr], function(x) {x$tryErrors},
                            FUN.VALUE = c("test"))
@@ -271,9 +280,11 @@ glmmSeq <- function(modelFormula,
   }, FUN.VALUE = c(1, 1)))
   
   nCheat <- resultList[noErr][[1]]$stats
-  s <- t(vapply(resultList[noErr], function(x) {x$stats},
-                FUN.VALUE = rep(1, length(nCheat))))
+  s <- data.frame(t(vapply(resultList[noErr], function(x) {x$stats},
+                           FUN.VALUE = rep(1, length(nCheat)))))
+  if(! is.na(dispersion)) s$Dispersion <- dispersion[rownames(s)]
   
+
   # Create GlmmSeq object with results
   new("GlmmSeq",
       formula = fullFormula,
@@ -292,7 +303,7 @@ glmmSeq <- function(modelFormula,
 
 #' Fit a glmer model for an individual gene
 #'
-#' @param geneList List with gene expression and dispersion
+#' @param geneList List with gene expression and optional dispersion
 #' @param fullFormula the model formula. For more information of formula
 #' structure see \code{\link[lme4:glmer]{lme4::glmer}}
 #' @param modelData Expanded design matrix
@@ -301,10 +312,6 @@ glmmSeq <- function(modelFormula,
 #' @param control the glmer control (default = glmerControl(optimizer = 
 #' "bobyqa")). For more information see
 #' \code{\link[lme4:glmerControl]{lme4::glmerControl}}.
-#' @param glmerFamily The GLM family, see 
-#' \code{\link[stats:glm]{stats::glm}} and 
-#' \code{\link[stats:family]{stats::family}}. If NULL 
-#' \code{\link[MASS:negative.binomial]{MASS::negative.binomial}} is used. 
 #' @param offset this can be used to specify an a priori known component to be
 #'  included in the linear predictor during fitting. For more information see
 #'  \code{\link[lme4:glmer]{lme4::glmer()}}.
@@ -326,17 +333,12 @@ glmerApply <- function(geneList,
                        modelData,
                        designMatrix,
                        offset,
-                       glmerFamily=NULL, 
                        ...) {
   data[, "count"] <- as.numeric(geneList$y)
   
-  if(is.null(glmerFamily)){
-    glmerFamily <- MASS::negative.binomial(theta = 1/geneList$dispersion)
-  }
-  
   fit <- try(suppressMessages(
     lme4::glmer(fullFormula, data = data, control = control, offset = offset,
-                family = glmerFamily, ...)), silent = TRUE)
+                family = geneList$family, ...)), silent = TRUE)
   
   if (class(fit) != "try-error") {
     # intercept dropped genes
@@ -344,10 +346,10 @@ glmerApply <- function(geneList,
       return( list(stats = NA, predict = NA, optinfo = NA,
                    tryErrors = attr(fit@pp$X, "msgRankdrop")) )
     }
-    stats <- setNames(c(geneList$dispersion, AIC(fit),
-                        as.numeric(logLik(fit))),
-                      c("Dispersion", "AIC", "logLik"))
+    stats <- setNames(c(AIC(fit),as.numeric(logLik(fit))),
+                      c("AIC", "logLik"))
     fixedEffects <- lme4::fixef(fit)
+    names(fixedEffects) <- paste0(names(fixedEffects), "_Beta")
     wald <- car::Anova(fit)
     waldtest <- setNames(c(wald[, "Chisq"], wald[, "Pr(>Chisq)"]),
                          c(paste0("Chisq_", rownames(wald)),

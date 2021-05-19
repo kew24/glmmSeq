@@ -4,6 +4,9 @@ News
 # glmmSeq v0.1.1
 ###### 18/04/2021
 
+##### Features
+* Add glmerFamily option to glmmSeq and glmmGene which changes the glm family
+
 ##### Bug Fixes
 * Fix colours in pairedPlots and modelPlots
 

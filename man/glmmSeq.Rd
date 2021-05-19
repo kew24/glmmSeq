@@ -36,7 +36,8 @@ structure see \code{\link[lme4:glmer]{lme4::glmer}}}
 \item{id}{Column name in metadata which contains the sample IDs to be used
 in pairing samples}
 
-\item{dispersion}{a numeric vector of gene dispersion}
+\item{dispersion}{a numeric vector of gene dispersion for the glmerFamily. If
+glmerFamily does not used dispersion, this can be set as NA.}
 
 \item{sizeFactors}{size factors (default = NULL). If provided the glmer
 offset is set to log(sizeFactors). For more information see

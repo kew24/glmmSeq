@@ -17,6 +17,10 @@
 #' (default=glmerControl(optimizer="bobyqa")).
 #' For more information see
 #' \code{\link[lme4:glmerControl]{lme4::glmerControl()}}.
+#' @param glmerFamily The GLM family, see 
+#' \code{\link[stats:glm]{stats::glm}} and 
+#' \code{\link[stats:family]{stats::family}}. If NULL 
+#' \code{\link[MASS:negative.binomial]{MASS::negative.binomial}} is used. 
 #' @param zeroCount numerical value to offset zeroes for the purpose of log
 #' (default=0.125)
 #' @param removeDuplicatedMeasures whether to remove duplicated
@@ -59,6 +63,7 @@ glmmGene <- function(modelFormula,
                      reducedFormula="",
                      modelData=NULL,
                      control=glmerControl(optimizer = "bobyqa"),
+                     glmerFamily = NULL,
                      zeroCount=0.125,
                      removeDuplicatedMeasures=FALSE,
                      removeSingles=FALSE,
@@ -68,12 +73,6 @@ glmmGene <- function(modelFormula,
   # Catch errors
   if (length(findbars(modelFormula)) == 0) {
     stop("No random effects terms specified in formula")
-  }
-  if (class(dispersion) != "numeric" | length(dispersion) != 1) {
-    stop("dispersion must be a single number")
-  }
-  if (class(dispersion) != "numeric" | length(dispersion) != 1) {
-    stop("dispersion must be a single number")
   }
   if (ncol(countdata) != nrow(metadata)) {
     stop("countdata columns different size to metadata rows")
@@ -156,9 +155,18 @@ glmmGene <- function(modelFormula,
 
   data <- subsetMetadata
   data[, "count"] <- as.numeric(countdata[gene, ])
+  
+  
+  if(is.null(glmerFamily)){
+    if (class(dispersion) != "numeric" | length(dispersion) != 1) {
+      stop("dispersion must be a single number")
+    }
+    glmerFamily <- MASS::negative.binomial(theta = 1/dispersion)
+  }
+  
   fit <- try(
     glmer(fullFormula, data = data, control = control, offset = offset,
-          family=MASS::negative.binomial(theta = 1/dispersion), ...),
+          family=glmerFamily, ...),
     silent=FALSE)
 
   return(fit)
