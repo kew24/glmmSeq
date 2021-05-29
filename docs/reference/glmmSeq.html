@@ -148,12 +148,14 @@
   <span class='va'>modelFormula</span>,
   <span class='va'>countdata</span>,
   <span class='va'>metadata</span>,
-  <span class='va'>id</span>,
   <span class='va'>dispersion</span>,
+  id <span class='op'>=</span> <span class='cn'>NA</span>,
   sizeFactors <span class='op'>=</span> <span class='cn'>NULL</span>,
   reducedFormula <span class='op'>=</span> <span class='st'>""</span>,
   modelData <span class='op'>=</span> <span class='cn'>NULL</span>,
+  glmOnly <span class='op'>=</span> <span class='cn'>FALSE</span>,
   control <span class='op'>=</span> <span class='fu'>glmerControl</span><span class='op'>(</span>optimizer <span class='op'>=</span> <span class='st'>"bobyqa"</span><span class='op'>)</span>,
+  family <span class='op'>=</span> <span class='cn'>NULL</span>,
   cores <span class='op'>=</span> <span class='fl'>1</span>,
   removeDuplicatedMeasures <span class='op'>=</span> <span class='cn'>FALSE</span>,
   removeSingles <span class='op'>=</span> <span class='cn'>FALSE</span>,
@@ -170,7 +172,7 @@
     <tr>
       <th>modelFormula</th>
       <td><p>the model formula. For more information of formula
-structure see <code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>lme4::glmer()</a></code></p></td>
+structure see <code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>glmer</a></code></p></td>
     </tr>
     <tr>
       <th>countdata</th>
@@ -181,19 +183,20 @@ structure see <code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>lme4::glme
       <td><p>a data frame of sample information</p></td>
     </tr>
     <tr>
+      <th>dispersion</th>
+      <td><p>a numeric vector of gene dispersion for the family. If
+family does not use dispersion, this can be set as NA.</p></td>
+    </tr>
+    <tr>
       <th>id</th>
       <td><p>Column name in metadata which contains the sample IDs to be used
 in pairing samples</p></td>
     </tr>
     <tr>
-      <th>dispersion</th>
-      <td><p>a numeric vector of gene dispersion</p></td>
-    </tr>
-    <tr>
       <th>sizeFactors</th>
       <td><p>size factors (default = NULL). If provided the glmer
 offset is set to log(sizeFactors). For more information see
-<code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>lme4::glmer()</a></code></p></td>
+<code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>glmer</a></code></p></td>
     </tr>
     <tr>
       <th>reducedFormula</th>
@@ -204,10 +207,23 @@ offset is set to log(sizeFactors). For more information see
       <td><p>Expanded design matrix</p></td>
     </tr>
     <tr>
+      <th>glmOnly</th>
+      <td><p>Logical whether to only run
+<code><a href='https://rdrr.io/r/stats/glm.html'>stats::glm</a></code> (TRUE) instead of
+<code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>lme4::glmer</a></code> (FALSE). Default is FALSE.</p></td>
+    </tr>
+    <tr>
       <th>control</th>
       <td><p>the glmer control (default = glmerControl(optimizer =
 "bobyqa")). For more information see
-<code><a href='https://rdrr.io/pkg/lme4/man/lmerControl.html'>lme4::glmerControl()</a></code>.</p></td>
+<code><a href='https://rdrr.io/pkg/lme4/man/lmerControl.html'>lme4::glmerControl</a></code>.</p></td>
+    </tr>
+    <tr>
+      <th>family</th>
+      <td><p>The GLM family, see
+<code><a href='https://rdrr.io/r/stats/glm.html'>stats::glm</a></code> and
+<code><a href='https://rdrr.io/r/stats/family.html'>stats::family</a></code>. If NULL
+<code><a href='https://rdrr.io/pkg/MASS/man/negative.binomial.html'>MASS::negative.binomial</a></code> is used.</p></td>
     </tr>
     <tr>
       <th>cores</th>
@@ -216,12 +232,13 @@ offset is set to log(sizeFactors). For more information see
     <tr>
       <th>removeDuplicatedMeasures</th>
       <td><p>whether to remove duplicated
-conditions/repeated measurements for a given time point (default = FALSE).</p></td>
+conditions/repeated measurements for a given time point (default = FALSE).
+Only used if glmOnly = FALSE.</p></td>
     </tr>
     <tr>
       <th>removeSingles</th>
       <td><p>whether to remove individuals with only one measurement
-(default = FALSE)</p></td>
+(default = FALSE). Only used if glmOnly = FALSE.</p></td>
     </tr>
     <tr>
       <th>zeroCount</th>
@@ -244,7 +261,7 @@ object (default = FALSE).</p></td>
     <tr>
       <th>...</th>
       <td><p>Other parameters to pass to
-<code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>lme4::glmer()</a></code></p></td>
+<code><a href='https://rdrr.io/pkg/lme4/man/glmer.html'>lme4::glmer</a></code></p></td>
     </tr>
     </table>
 

@@ -34,9 +34,9 @@ edgeR
 fcPlots
 ggplot
 glm
+glmOnly
 glmer
 glmerControl
-glmerFamily
 glmm
 glmmGene
 glmmResult

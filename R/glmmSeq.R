@@ -1,4 +1,5 @@
 setClassUnion("character_or_list", c("character", "list"))
+setClassUnion("character_or_list_or_NULL", c("character", "list", "NULL"))
 setClassUnion("df_or_matrix", c("data.frame", "matrix"))
 
 #' An S4 class to define the glmmSeq output
@@ -24,7 +25,7 @@ setClass("GlmmSeq", slots = list(
   modelData = "df_or_matrix",
   optInfo = "matrix",
   errors = "character_or_list",
-  variables = "character_or_list"
+  variables = "character_or_list_or_NULL"
 ))
 
 
@@ -56,8 +57,9 @@ setClass("GlmmSeq", slots = list(
 #' @param cores number of cores to use. Default = 1. 
 #' @param removeDuplicatedMeasures whether to remove duplicated
 #' conditions/repeated measurements for a given time point (default = FALSE).
+#' Only used if glmOnly = FALSE. 
 #' @param removeSingles whether to remove individuals with only one measurement
-#' (default = FALSE)
+#' (default = FALSE). Only used if glmOnly = FALSE. 
 #' @param zeroCount numerical value to offset zeroes for the purpose of log
 #' (default = 0.125)
 #' @param verbose Logical whether to display messaging (default = TRUE)
@@ -65,7 +67,7 @@ setClass("GlmmSeq", slots = list(
 #' object (default = FALSE).
 #' @param progress Logical whether to display a progress bar
 #' @param ... Other parameters to pass to
-#' \code{\link[lme4:glmer]{lme4::glmer()}}
+#' \code{\link[lme4:glmer]{lme4::glmer}}
 #' @return Returns a GlmmSeq object with results for gene-wise general linear
 #' mixed models or a list of results if returnList is TRUE.
 #' @importFrom MASS negative.binomial
@@ -96,8 +98,8 @@ setClass("GlmmSeq", slots = list(
 glmmSeq <- function(modelFormula,
                     countdata,
                     metadata,
-                    id,
                     dispersion,
+                    id = NA,
                     sizeFactors = NULL,
                     reducedFormula = "",
                     modelData = NULL,
@@ -145,56 +147,65 @@ glmmSeq <- function(modelFormula,
   nonRandomFormula <- subbars(modelFormula)
   variables <- rownames(attr(terms(nonRandomFormula), "factors"))
   subsetMetadata <- metadata[, variables]
-  ids <- as.character(metadata[, id])
   
-  
-  # Option to subset to remove duplicated timepoints
-  if (removeDuplicatedMeasures) {
-    # Check the distribution for duplicates
-    check <- data.frame(table(droplevels(subsetMetadata)))
-    check <- check[! check$Freq %in% c(0, 1), ]
-    if (nrow(check) > 0) {
-      mCheck <- as.character(apply(subsetMetadata[, variables], 1, function(x) {
-        paste(as.character(x), collapse = " ")
-      }))
-      cCheck <- as.character(apply(check[, variables], 1, function(x) {
-        paste(as.character(x), collapse = " ")
-      }))
-      countdata <- countdata[, ! mCheck %in% cCheck]
-      sizeFactors <- sizeFactors[! mCheck %in% cCheck]
-      subsetMetadata <- subsetMetadata[! mCheck %in% cCheck, ]
-      ids <- droplevels(subsetMetadata[, id])
-      warning(paste0(paste(check[, id], collapse = ", "),
-                     " has multiple entries for identical ",
-                     paste0(colnames(check)[! colnames(check) %in%
-                                              c(id, "Freq")],
-                            collapse = " and "),
-                     ". These will all be removed."))
-    }
-  }
-  
-  
-  # Option to subset to remove unpaired samples
-  if (removeSingles) {
-    singles <- names(table(ids)[table(ids) %in% c(0, 1)])
-    nonSingleIDs <- which(! subsetMetadata[, id] %in% singles)
+  if(! glmOnly) {
+    if(! id %in% colnames(metadata)) 
+      stop("id must be a column name in metadata")
     
-    countdata <- countdata[, nonSingleIDs]
-    sizeFactors <- sizeFactors[nonSingleIDs]
-    subsetMetadata <- subsetMetadata[nonSingleIDs, ]
-    ids <- droplevels(subsetMetadata[, id])
-  }
-  
-  # Check numbers and alignment
-  if (! all(vapply(list(length(ids), nrow(subsetMetadata)), FUN = identical,
-                   FUN.VALUE = TRUE, ncol(countdata)))) {
-    stop("Alignment error: metadata rownames must match countdata colnames")
+    ids <- as.character(metadata[, id])
+    
+    
+    # Option to subset to remove duplicated timepoints
+    if (removeDuplicatedMeasures) {
+      # Check the distribution for duplicates
+      check <- data.frame(table(droplevels(subsetMetadata)))
+      check <- check[! check$Freq %in% c(0, 1), ]
+      if (nrow(check) > 0) {
+        mCheck <- as.character(
+          apply(subsetMetadata[, variables], 1, function(x) {
+            paste(as.character(x), collapse = " ")
+          }))
+        cCheck <- as.character(apply(check[, variables], 1, function(x) {
+          paste(as.character(x), collapse = " ")
+        }))
+        countdata <- countdata[, ! mCheck %in% cCheck]
+        sizeFactors <- sizeFactors[! mCheck %in% cCheck]
+        subsetMetadata <- subsetMetadata[! mCheck %in% cCheck, ]
+        ids <- droplevels(subsetMetadata[, id])
+        warning(paste0(paste(check[, id], collapse = ", "),
+                       " has multiple entries for identical ",
+                       paste0(colnames(check)[! colnames(check) %in%
+                                                c(id, "Freq")],
+                              collapse = " and "),
+                       ". These will all be removed."))
+      }
+    }
+    
+    
+    # Option to subset to remove unpaired samples
+    if (removeSingles) {
+      singles <- names(table(ids)[table(ids) %in% c(0, 1)])
+      nonSingleIDs <- which(! subsetMetadata[, id] %in% singles)
+      
+      countdata <- countdata[, nonSingleIDs]
+      sizeFactors <- sizeFactors[nonSingleIDs]
+      subsetMetadata <- subsetMetadata[nonSingleIDs, ]
+      ids <- droplevels(subsetMetadata[, id])
+    }
+    
+    
+    # Check numbers and alignment
+    if (! all(vapply(list(length(ids), nrow(subsetMetadata)), FUN = identical,
+                     FUN.VALUE = TRUE, ncol(countdata)))) {
+      stop("Alignment error: metadata rownames must match countdata colnames")
+    }
+    
+    
+    if (verbose) cat(paste0("\nn = ", length(ids), " samples, ",
+                            length(unique(ids)), " individuals\n"))
   }
   
   if (!is.null(sizeFactors)) offset <- log(sizeFactors) else offset <- NULL
-  if (verbose) cat(paste0("\nn = ", length(ids), " samples, ",
-                          length(unique(ids)), " individuals\n"))
-  
   
   # setup model prediction
   if (reducedFormula == "") reducedFormula <- nobars(modelFormula)
@@ -210,7 +221,7 @@ glmmSeq <- function(modelFormula,
   }
   designMatrix <- model.matrix(reducedFormula, modelData)
   
-  start <- Sys.time()
+  
   fullList <- lapply(rownames(countdata), function(i) {
     familyInput <- family 
     if(length(familyInput$family) > 1) {
@@ -236,6 +247,7 @@ glmmSeq <- function(modelFormula,
     }
   }
   
+  start <- Sys.time()
   if (Sys.info()["sysname"] == "Windows") {
     cl <- makeCluster(cores)
     clusterExport(cl, varlist = c("functionUsed", 
@@ -289,7 +301,7 @@ glmmSeq <- function(modelFormula,
   if (length(which(noErr)) == 0) { 
     stop("All genes returned an error. Check sufficient data in each group")
   }
-
+  
   nCheat <- resultList[noErr][[1]]$predict
   outputPredict <- t(vapply(resultList[noErr], function(x) x$predict,
                             FUN.VALUE = rep(1, length(nCheat))))
@@ -298,7 +310,7 @@ glmmSeq <- function(modelFormula,
   colnames(outputPredict) <- c(paste0("y_", outLabels),
                                paste0("LCI_", outLabels),
                                paste0("UCI_", outLabels))
-
+  
   if (sum(!noErr) != 0) {
     if (verbose) cat(paste0("Errors in ", sum(!noErr), " gene(s): ",
                             paste0(names(noErr)[! noErr], collapse = ", ")))
@@ -308,13 +320,15 @@ glmmSeq <- function(modelFormula,
   optInfo <- t(vapply(resultList[noErr], function(x) {
     setNames(x$optinfo, names(x$optinfo))
   }, FUN.VALUE = c(1, 1)))
-
+  
   nCheat <- resultList[noErr][[1]]$stats
   s <- data.frame(t(vapply(resultList[noErr], function(x) {x$stats},
                            FUN.VALUE = rep(1, length(nCheat)))), 
                   check.names = FALSE)
   if(length(dispersion) > 1) s$Dispersion <- dispersion[rownames(s)]
-
+  
+  if(glmOnly) id <- NULL
+  
   # Create GlmmSeq object with results
   new("GlmmSeq",
       formula = fullFormula,
@@ -437,10 +451,10 @@ glmApply <- function(geneList,
                      offset,
                      ...) {
   data[, "count"] <- as.numeric(geneList$y)
-
+  
   fit <- try(suppressMessages(
     glm(fullFormula, data = data, control = control, offset = offset,
-        family = geneList$family, ...)), silent = TRUE)
+        family = geneList$family)))#, ...)), silent = TRUE)
   
   if (class(fit) != "try-error") {
     stats <- setNames(c(AIC(fit), as.numeric(logLik(fit)), fit$deviance),
@@ -458,10 +472,11 @@ glmApply <- function(geneList,
     newLCI <- exp(newY - newSE * 1.96)
     newUCI <- exp(newY + newSE * 1.96)
     predictdf <- c(exp(newY), newLCI, newUCI)
+    optinfo <- c("boundary"=fit$boundary, "converged"=fit$converged)
     rm(fit, data)
     return(list(stats = c(stats, fixedEffects, pValues),
                 predict = predictdf,
-                optinfo = c("boundary"=fit$boundary, "converged"=fit$converged),
+                optinfo = optinfo,
                 tryErrors = "") )
   } else {
     return(list(stats = NA, predict = NA, optinfo = NA, tryErrors = fit[1]))

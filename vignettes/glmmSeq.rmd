@@ -18,7 +18,7 @@ vignette: >
 </style>  
   
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE, fig.width = 8, fig.height = 6)
+knitr::opts_chunk$set(echo = TRUE, fig.width = 8, fig.height = 6, cache=TRUE)
 options(width=96)
 library(kableExtra)
 ```
@@ -42,9 +42,8 @@ The aim of this package is to model gene expression with a general linear mixed
 model (glmm). The most widely used mainstream differential gene expression analysis tools 
 (e.g [Limma](https://doi.org/10.1093/nar/gkv007), [DESeq2](https://doi.org/10.1186/s13059-014-0550-8), 
 [edgeR](https://doi.org/10.1093/bioinformatics/btp616)) are all unable to fit 
-mixed effects linear models. This package however fits negative binomial mixed 
-effects models at individual gene level using the `negative.binomial` function
-from `MASS` and the `glmer` function in 
+mixed effects linear models. This package however fits mixed 
+effects models at individual gene level (using the `negative.binomial` family by default) and the `glmer` function in 
 [`lme4`](https://CRAN.R-project.org/package=lme4) which enables random 
 effect, as as well as mixed effects, to be modelled.
 
@@ -99,7 +98,7 @@ To get started, first we load in the package:
 
 ```{r, message=FALSE, warning=FALSE}
 library(glmmSeq)
-set.seed(1234)
+#set.seed(1234)
 ```
 
 
@@ -234,7 +233,7 @@ this analysis can take some time, with 2 cores:
 - 1000 genes takes about 20 seconds
 - All ~20000 genes takes about 9 mins
 
-```{r, warning=FALSE}
+```{r glmmseq, warning=FALSE}
 results <- glmmSeq(modelFormula = ~ Timepoint * EULAR_6m + (1 | PATID),
                   id = "PATID",
                   countdata = tpm,
@@ -249,26 +248,25 @@ results <- glmmSeq(modelFormula = ~ Timepoint * EULAR_6m + (1 | PATID),
 
 Or using glm only, as opposed to glmer:
 
-```{r}
+```{r glmonly, warning=FALSE}
 results_glm <- glmmSeq(modelFormula = ~ Timepoint * EULAR_6m,
-                  id = "PATID",
                   countdata = tpm,
                   metadata = metadata,
                   dispersion = disp,
-                  sizeFactors=NULL,
+                  sizeFactors = NULL,
                   family = NULL,
-                  control=list(),
-                  glmOnly = TRUE, 
+                  control = list(),
+                  glmOnly = TRUE,
                   removeDuplicatedMeasures = FALSE,
-                  removeSingles=FALSE,
-                  returnList=FALSE,
-                  progress=TRUE,
+                  removeSingles = FALSE,
+                  returnList = FALSE,
+                  progress = TRUE,
                   cores = 1)
 ```
 
 or alternatively using two-factor classification with EULAR_binary: 
 
-```{r, warning=FALSE}
+```{r binary, warning=FALSE}
 results2 <- glmmSeq(~ Timepoint * EULAR_binary + (1 | PATID),
                   id = "PATID",
                   countdata = tpm,
@@ -282,16 +280,16 @@ results2 <- glmmSeq(~ Timepoint * EULAR_binary + (1 | PATID),
 
 Additionally we can change the glm family: 
 
-```{r}
+```{r poisson, warning=FALSE}
 results_poisson <- glmmSeq(~ Timepoint * EULAR_6m + (1 | PATID),
                   id = "PATID",
                   countdata = tpm,
                   metadata = metadata,
                   dispersion = NA,
                   removeDuplicatedMeasures = FALSE,
-                  removeSingles=FALSE,
-                  progress=TRUE,
-                  family = poisson(),
+                  removeSingles = FALSE,
+                  progress = TRUE,
+                  family = stats::poisson(),
                   cores = 1)
 ```
 
@@ -340,7 +338,7 @@ add qvalue columns to the `@stats` slot:
 results <- glmmQvals(results, pi0=1)
 ```
 
-## Individual Genes
+# Individual Genes
 
 Similarly you can run the script for an individual gene:
 
@@ -378,6 +376,7 @@ Plots can be viewed using either ggplot or base graphics. We can start looking
 at the gene with the most significant interaction _IGHV3-23_:
 
 ```{r, fig.height=6, warning=FALSE}
+library(ggplot2)
 plotColours <- c("skyblue", "goldenrod1", "mediumseagreen")
 modColours <- c("Good responder"="dodgerblue3", 
                 "Moderate responder"= "goldenrod3", 
@@ -403,7 +402,7 @@ p1 <- pairedPlot(glmmResult=results_poisson,
            addViolin = TRUE,
            pairedOnly = FALSE) + labs(title="Poisson", y="IGHV3-23")
 
-p2 <- pairedPlot(glmmResult=results_glm,
+p2 <- pairedPlot(glmmResult=results,
            geneName = "IGHV3-23",
            x1Label = "Timepoint",
            x2Label="EULAR_6m",
@@ -440,17 +439,18 @@ p1 <- pairedPlot(glmmResult=results2,
                 fontSize=0.65,
                 colours=c("coral", "mediumseagreen"),
                 addModel=T,
-                modelColours = c("coral", "mediumseagreen"),
+                modelColours = "black",
                 modelLineColours = "black",
                 modelSize = 2)
 
 p2 <- pairedPlot(glmmResult=results,
-                geneName = "EMILIN3",
+                geneName = "FGF14",
                 x1Label = "Timepoint",
                 x2Label="EULAR_6m",
                 IDColumn = "PATID",
                 addModel=TRUE,
                 graphics="base",
+                modelSize=2, 
                 fontSize=0.65,
                 colours=plotColours)
 
@@ -460,7 +460,7 @@ par(oldpar)
 
 # Model plots
 
-Alternatively to plot the model fits alone you can use the modelPlot function:
+Alternatively to plot the model fits alone you can use the modelPlot function. This also allows us to compare glm and glmer fits directly:
 
 ```{r, message=FALSE}
 library(ggpubr)
@@ -475,7 +475,8 @@ p1 <- modelPlot(results,
                 overlap=TRUE,
                 graphics="ggplot",
                 colours = plotColours) + 
-  labs(title="ADAM12 with random effects (Chi-Sq stats)")
+  labs(title="ADAM12 with random effects (Chi-Sq stats)") + 
+  lims(y=c(0, 12.5))
 
 p2 <- modelPlot(results_glm,
                 "ADAM12",
@@ -488,7 +489,8 @@ p2 <- modelPlot(results_glm,
                 overlap=TRUE,
                 graphics="ggplot",
                 colours = plotColours) + 
-  labs(title="ADAM12 without random effects (t stats)")
+  labs(title="ADAM12 without random effects (t-stats)") + 
+  lims(y=c(0, 12.5))
 
 ggarrange(p1, p2, ncol=2, common.legend = T, legend="bottom")
 ```
@@ -516,7 +518,7 @@ fcPlot(glmmResult=results,
        pCutoff=0.1,
        labels=labels,
        useAdjusted = FALSE,
-       plotCutoff = 1)
+       plotCutoff = 0.1)
 ```
 
 Genes on the x-y plane, such as _IGHJ6_, will have associations in the same 
@@ -572,9 +574,6 @@ fcPlot(glmmResult=results,
        graphics="ggplot")
 ```
 
-
-
-
 # MA plots
 
 An MA plot is an application of a Bland–Altman plot. The plot visualizes the
@@ -624,10 +623,10 @@ Statistical software used in this package:
 
 1. [lme4](https://dx.doi.org/10.18637/jss.v067.i01): Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1-48. doi: 10.18637/jss.v067.i01.
 
-2. [stats](https://dx.doi.org/10.18637/jss.v067.i01): Douglas Bates, Martin Maechler, Ben Bolker, Steve Walker (2015). Fitting Linear Mixed-Effects Models Using lme4. Journal of Statistical Software, 67(1), 1-48. doi: 10.18637/jss.v067.i01.
+2. [stats](https://www.R-project.org/): R Core Team (2020). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria.
 
-3. [car](https://socialsciences.mcmaster.ca/jfox/Books/Companion/): John Fox and Sanford Weisberg (2019). An {R} Companion to Applied Regression, Third Edition. Thousand Oaks CA: Sage. URL: https://socialsciences.mcmaster.ca/jfox/Books/Companion/
+3. [car](https://socialsciences.mcmaster.ca/jfox/Books/Companion/): John Fox and Sanford Weisberg (2019). An {R} Companion to Applied Regression, Third Edition. Thousand Oaks CA: Sage. 
   
 4. [MASS](https://www.stats.ox.ac.uk/pub/MASS4/VR4stat.pdf): Venables, W. N. & Ripley, B. D. (2002) Modern Applied Statistics with S. Fourth Edition. Springer, New York. ISBN 0-387-95457-0
 
-5. [qvalue](https://github.com/StoreyLab/qvalue): John D. Storey, Andrew J. Bass, Alan Dabney and David Robinson (2020). qvalue: Q-value estimation for false discovery rate control. R package version 2.22.0. https://github.com/StoreyLab/qvalue
+5. [qvalue](https://github.com/StoreyLab/qvalue): John D. Storey, Andrew J. Bass, Alan Dabney and David Robinson (2020). qvalue: Q-value estimation for false discovery rate control. R package version 2.22.0. 

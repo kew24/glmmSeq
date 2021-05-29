@@ -13,8 +13,8 @@
 #' @param useAdjusted whether to use adjusted pvalues
 #' (must have q_ columns in glmmResult). Default = FALSE
 #' @param plotCutoff Which probes to include on plot by significance cut-off
-#' (default = 1, for all markers). If any Chi-Sq p-values are significant then 
-#' the probes are included
+#' (default = 1, for all markers). If any p-values (standard p-values as well 
+#' as interaction terms) are significant then the probes are included. 
 #' @param graphics Graphics system to use: "ggplot" or "plotly"
 #' @param fontSize Font size
 #' @param labelFontSize Font size for labels
@@ -211,11 +211,13 @@ fcPlot <- function(glmmResult,
       layout(annotations = annot,
              xaxis = list(title = paste0("log<sub>2</sub>Fold change ",
                                          x1Values[1], " vs ", x1Values[2],
-                                         " (", x2Label, " = ", x2Values[1], ")"),
+                                         " (", x2Label, " = ", x2Values[1], 
+                                         ")"),
                           color = 'black'),
              yaxis = list(title = paste0("log<sub>2</sub>Fold change ",
                                          x1Values[1], " vs ", x1Values[2],
-                                         " (", x2Label, " = ", x2Values[2], ")"),
+                                         " (", x2Label, " = ", x2Values[2], 
+                                         ")"),
                           color = 'black'),
              font = list(size = fontSize),
              legend = list(x = 0, y = 1, font = list(color = 'black'))) %>%

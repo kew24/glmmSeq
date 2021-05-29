@@ -43,7 +43,8 @@ change. If NULL the first two levels in x1Label are used.}
 (must have q_ columns in glmmResult). Default = FALSE}
 
 \item{plotCutoff}{Which probes to include on plot by significance cut-off
-(default = 1, for all markers)}
+(default = 1, for all markers). If any p-values (standard p-values as well
+as interaction terms) are significant then the probes are included.}
 
 \item{graphics}{Graphics system to use: "ggplot" or "plotly"}
 

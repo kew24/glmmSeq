@@ -1,7 +1,7 @@
 #' Glmm for sequencing results of a single gene
 #'
 #' @param modelFormula the model formula. For more information of formula
-#' structure see \code{\link[lme4:glmer]{lme4::glmer()}}.
+#' structure see \code{\link[lme4:glmer]{lme4::glmer}}.
 #' @param countdata the sequencing data
 #' @param gene the row name in countdata to be used
 #' @param metadata a data frame of sample information
@@ -13,11 +13,13 @@
 #'  \code{\link[lme4:glmer]{lme4::glmer()}}
 #' @param reducedFormula Reduced design formula (default="")
 #' @param modelData something something
-#' @param control  the glmer control
-#' (default=glmerControl(optimizer="bobyqa")).
-#' For more information see
-#' \code{\link[lme4:glmerControl]{lme4::glmerControl()}}.
-#' @param glmerFamily The GLM family, see 
+#' @param glmOnly Logical whether to only run 
+#' \code{\link[stats:glm]{stats::glm}} (TRUE) instead of 
+#' \code{\link[lme4:glmer]{lme4::glmer}} (FALSE). Default is FALSE. 
+#' @param control the glmer control (default = glmerControl(optimizer = 
+#' "bobyqa")). For more information see
+#' \code{\link[lme4:glmerControl]{lme4::glmerControl}}.
+#' @param family The GLM family, see 
 #' \code{\link[stats:glm]{stats::glm}} and 
 #' \code{\link[stats:family]{stats::family}}. If NULL 
 #' \code{\link[MASS:negative.binomial]{MASS::negative.binomial}} is used. 
@@ -25,11 +27,12 @@
 #' (default=0.125)
 #' @param removeDuplicatedMeasures whether to remove duplicated
 #' conditions/repeated measurements for a given time point (default=FALSE).
+#' Only used if glmOnly = FALSE. 
 #' @param removeSingles whether to remove individuals with only one measurement
-#' (default=FALSE)
+#' (default=FALSE). Only used if glmOnly = FALSE. 
 #' @param verbose Logical whether to display messaging (default=FALSE)
 #' @param ... Other parameters to pass to
-#' \code{\link[lme4:glmer]{lme4::glmer()}}.
+#' \code{\link[lme4:glmer]{lme4::glmer}}.
 #' @return Returns the fit for the general linear mixed model of a single gene
 #' @importFrom MASS negative.binomial
 #' @importFrom lme4 subbars findbars glmer fixef glmerControl nobars
@@ -59,20 +62,29 @@ glmmGene <- function(modelFormula,
                      metadata,
                      id,
                      dispersion,
-                     sizeFactors=NULL,
-                     reducedFormula="",
-                     modelData=NULL,
-                     control=glmerControl(optimizer = "bobyqa"),
-                     glmerFamily = NULL,
-                     zeroCount=0.125,
-                     removeDuplicatedMeasures=FALSE,
-                     removeSingles=FALSE,
-                     verbose=FALSE,
+                     sizeFactors = NULL,
+                     reducedFormula = "",
+                     modelData = NULL,
+                     glmOnly = FALSE,
+                     control = glmerControl(optimizer = "bobyqa"),
+                     family = NULL,
+                     zeroCount = 0.125,
+                     removeDuplicatedMeasures = FALSE,
+                     removeSingles = FALSE,
+                     verbose = FALSE,
                      ...){
-
+  
   # Catch errors
-  if (length(findbars(modelFormula)) == 0) {
-    stop("No random effects terms specified in formula")
+  # Catch errors
+  if (! glmOnly & length(findbars(modelFormula)) == 0) {
+    warning(paste("glmOnly is FALSE but no random effects specified in", 
+                  "formula. Running glm instead"))
+    glmOnly <- TRUE
+  } 
+  if (glmOnly & length(findbars(modelFormula)) > 0) {
+    warning(paste("glmOnly is TRUE but random effects specified in formula.", 
+                  "Running glmer instead"))
+    glmOnly <- FALSE
   }
   if (ncol(countdata) != nrow(metadata)) {
     stop("countdata columns different size to metadata rows")
@@ -83,64 +95,73 @@ glmmGene <- function(modelFormula,
   if (! gene %in% rownames(countdata)) {
     stop("gene must be in rownames(countdata)")
   }
+  if(is.null(family)){
+    family <- MASS::negative.binomial(theta = 1/dispersion)
+  }
   if (! is.numeric(zeroCount)) stop("zeroCount must be numeric")
   if (zeroCount < 0) stop("zeroCount must be >= 0")
   if (zeroCount > 0) countdata[countdata == 0] <- zeroCount
-
+  
   # Manipulate formulae
   fullFormula <- update.formula(modelFormula, count ~ ., simplify = FALSE)
   nonRandomFormula <- subbars(modelFormula)
   variables <- rownames(attr(terms(nonRandomFormula), "factors"))
   subsetMetadata <- metadata[, variables]
-  ids <- as.character(metadata[, id])
-
-
-  # Option to subset to remove duplicated timepoints
-  if (removeDuplicatedMeasures) {
-    # Check the distribution for duplicates
-    check <- data.frame(table(droplevels(subsetMetadata)))
-    check <- check[! check$Freq %in% c(0, 1), ]
-    if (nrow(check) > 0) {
-      mCheck <- as.character(apply(subsetMetadata[, variables], 1, function(x) {
-        paste(as.character(x), collapse = " ")
-      }))
-      cCheck <- as.character(apply(check[, variables], 1, function(x) {
-        paste(as.character(x), collapse = " ")
-      }))
-      countdata <- countdata[, ! mCheck %in% cCheck]
-      sizeFactors <- sizeFactors[! mCheck %in% cCheck]
-      subsetMetadata <- subsetMetadata[! mCheck %in% cCheck, ]
-      ids <- droplevels(subsetMetadata[, id])
-      warning(paste0(paste(check[, id], collapse = ", "),
-                     " has multiple entries for identical ",
-                     paste0(colnames(check)[! colnames(check) %in%
-                                              c(id, "Freq")],
-                            collapse = " and "),
-                     ". These will all be removed."))
+  
+  if(! glmOnly) {
+    if(! id %in% colnames(metadata)) 
+      stop("id must be a column name in metadata")
+    ids <- as.character(metadata[, id])
+    
+    
+    # Option to subset to remove duplicated timepoints
+    if (removeDuplicatedMeasures) {
+      # Check the distribution for duplicates
+      check <- data.frame(table(droplevels(subsetMetadata)))
+      check <- check[! check$Freq %in% c(0, 1), ]
+      if (nrow(check) > 0) {
+        mCheck <- as.character(
+          apply(subsetMetadata[, variables], 1, function(x) {
+            paste(as.character(x), collapse = " ")
+          }))
+        cCheck <- as.character(apply(check[, variables], 1, function(x) {
+          paste(as.character(x), collapse = " ")
+        }))
+        countdata <- countdata[, ! mCheck %in% cCheck]
+        sizeFactors <- sizeFactors[! mCheck %in% cCheck]
+        subsetMetadata <- subsetMetadata[! mCheck %in% cCheck, ]
+        ids <- droplevels(subsetMetadata[, id])
+        warning(paste0(paste(check[, id], collapse = ", "),
+                       " has multiple entries for identical ",
+                       paste0(colnames(check)[! colnames(check) %in%
+                                                c(id, "Freq")],
+                              collapse = " and "),
+                       ". These will all be removed."))
+      }
     }
-  }
-
-
-  # Option to subset to remove unpaired samples
-  if (removeSingles) {
-    singles <- names(table(ids)[table(ids) %in% c(0, 1)])
-    nonSingleIDs <- which(! subsetMetadata[, id] %in% singles)
-
-    countdata <- countdata[, nonSingleIDs]
-    sizeFactors <- sizeFactors[nonSingleIDs]
-    subsetMetadata <- subsetMetadata[nonSingleIDs, ]
-    ids <- droplevels(subsetMetadata[, id])
-  }
-
-  # Check numbers and alignment
-  if (! all(vapply(list(length(ids), nrow(subsetMetadata)), FUN = identical,
-                  FUN.VALUE = TRUE, ncol(countdata)))) {
-    stop("Alignment error")
+    
+    
+    # Option to subset to remove unpaired samples
+    if (removeSingles) {
+      singles <- names(table(ids)[table(ids) %in% c(0, 1)])
+      nonSingleIDs <- which(! subsetMetadata[, id] %in% singles)
+      
+      countdata <- countdata[, nonSingleIDs]
+      sizeFactors <- sizeFactors[nonSingleIDs]
+      subsetMetadata <- subsetMetadata[nonSingleIDs, ]
+      ids <- droplevels(subsetMetadata[, id])
+    }
+    
+    # Check numbers and alignment
+    if (! all(vapply(list(length(ids), nrow(subsetMetadata)), FUN = identical,
+                     FUN.VALUE = TRUE, ncol(countdata)))) {
+      stop("Alignment error")
+    }
+    if (verbose) cat(paste0("\nn=", length(ids), " samples, ",
+                            length(unique(ids)), " individuals\n"))
   }
   if (!is.null(sizeFactors)) offset <- log(sizeFactors) else offset <- NULL
-  if (verbose) cat(paste0("\nn=", length(ids), " samples, ",
-                          length(unique(ids)), " individuals\n"))
-
+  
   # setup model prediction
   if (reducedFormula == "") reducedFormula <- nobars(modelFormula)
   if (is.null(modelData)) {
@@ -152,23 +173,34 @@ glmmGene <- function(modelFormula,
     modelData <- expand.grid(varLevels)
     colnames(modelData) <- reducedVars
   }
-
+  
   data <- subsetMetadata
   data[, "count"] <- as.numeric(countdata[gene, ])
   
   
-  if(is.null(glmerFamily)){
-    if (class(dispersion) != "numeric" | length(dispersion) != 1) {
-      stop("dispersion must be a single number")
+  # Perform a fit
+  if(glmOnly) {
+    functionUsed <- glmApply 
+    if("glmerControl" %in% class(control)) {
+      control <- list()
+      message("glmer control passed into glm, using control <- list() instead")
     }
-    glmerFamily <- MASS::negative.binomial(theta = 1/dispersion)
+    
+    fit <- try(glm(fullFormula, data = data, control = control, 
+                   offset = offset, family = family, ...), silent = TRUE)
+    
+  } else {
+    
+    if(! "glmerControl" %in% class(control)) {
+      control <- glmerControl()
+      message(paste("Control not of class 'glmer control', using control <-", 
+                    "glmerControl() instead"))
+    }
+    fit <- try(glmer(fullFormula, data = data, control = control, 
+                     offset = offset, family=family, ...), silent=FALSE)
   }
   
-  fit <- try(
-    glmer(fullFormula, data = data, control = control, offset = offset,
-          family=glmerFamily, ...),
-    silent=FALSE)
-
+  
   return(fit)
-
+  
 }

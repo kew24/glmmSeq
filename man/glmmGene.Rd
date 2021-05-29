@@ -14,8 +14,9 @@ glmmGene(
   sizeFactors = NULL,
   reducedFormula = "",
   modelData = NULL,
+  glmOnly = FALSE,
   control = glmerControl(optimizer = "bobyqa"),
-  glmerFamily = NULL,
+  family = NULL,
   zeroCount = 0.125,
   removeDuplicatedMeasures = FALSE,
   removeSingles = FALSE,
@@ -25,7 +26,7 @@ glmmGene(
 }
 \arguments{
 \item{modelFormula}{the model formula. For more information of formula
-structure see \code{\link[lme4:glmer]{lme4::glmer()}}.}
+structure see \code{\link[lme4:glmer]{lme4::glmer}}.}
 
 \item{countdata}{the sequencing data}
 
@@ -46,12 +47,15 @@ is set to log(sizeFactors).For more information see
 
 \item{modelData}{something something}
 
-\item{control}{the glmer control
-(default=glmerControl(optimizer="bobyqa")).
-For more information see
-\code{\link[lme4:glmerControl]{lme4::glmerControl()}}.}
+\item{glmOnly}{Logical whether to only run
+\code{\link[stats:glm]{stats::glm}} (TRUE) instead of
+\code{\link[lme4:glmer]{lme4::glmer}} (FALSE). Default is FALSE.}
 
-\item{glmerFamily}{The GLM family, see
+\item{control}{the glmer control (default = glmerControl(optimizer =
+"bobyqa")). For more information see
+\code{\link[lme4:glmerControl]{lme4::glmerControl}}.}
+
+\item{family}{The GLM family, see
 \code{\link[stats:glm]{stats::glm}} and
 \code{\link[stats:family]{stats::family}}. If NULL
 \code{\link[MASS:negative.binomial]{MASS::negative.binomial}} is used.}
@@ -60,15 +64,16 @@ For more information see
 (default=0.125)}
 
 \item{removeDuplicatedMeasures}{whether to remove duplicated
-conditions/repeated measurements for a given time point (default=FALSE).}
+conditions/repeated measurements for a given time point (default=FALSE).
+Only used if glmOnly = FALSE.}
 
 \item{removeSingles}{whether to remove individuals with only one measurement
-(default=FALSE)}
+(default=FALSE). Only used if glmOnly = FALSE.}
 
 \item{verbose}{Logical whether to display messaging (default=FALSE)}
 
 \item{...}{Other parameters to pass to
-\code{\link[lme4:glmer]{lme4::glmer()}}.}
+\code{\link[lme4:glmer]{lme4::glmer}}.}
 }
 \value{
 Returns the fit for the general linear mixed model of a single gene

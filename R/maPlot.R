@@ -66,6 +66,11 @@ maPlot <- function(glmmResult,
                    graphics="ggplot",
                    verbose=FALSE){
 
+  if(is.null(findbars(glmmResult@formula))){
+    stop(paste("This looks like a glm output. fcPlots can only be run with", 
+               "glmer models. "))
+  }
+  
   # Extract the data
   predict <- glmmResult@predict
   stats <- glmmResult@stats

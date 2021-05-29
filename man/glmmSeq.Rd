@@ -8,8 +8,8 @@ glmmSeq(
   modelFormula,
   countdata,
   metadata,
-  id,
   dispersion,
+  id = NA,
   sizeFactors = NULL,
   reducedFormula = "",
   modelData = NULL,
@@ -34,11 +34,11 @@ structure see \code{\link[lme4:glmer]{glmer}}}
 
 \item{metadata}{a data frame of sample information}
 
-\item{id}{Column name in metadata which contains the sample IDs to be used
-in pairing samples}
-
 \item{dispersion}{a numeric vector of gene dispersion for the family. If
 family does not use dispersion, this can be set as NA.}
+
+\item{id}{Column name in metadata which contains the sample IDs to be used
+in pairing samples}
 
 \item{sizeFactors}{size factors (default = NULL). If provided the glmer
 offset is set to log(sizeFactors). For more information see
@@ -64,10 +64,11 @@ offset is set to log(sizeFactors). For more information see
 \item{cores}{number of cores to use. Default = 1.}
 
 \item{removeDuplicatedMeasures}{whether to remove duplicated
-conditions/repeated measurements for a given time point (default = FALSE).}
+conditions/repeated measurements for a given time point (default = FALSE).
+Only used if glmOnly = FALSE.}
 
 \item{removeSingles}{whether to remove individuals with only one measurement
-(default = FALSE)}
+(default = FALSE). Only used if glmOnly = FALSE.}
 
 \item{zeroCount}{numerical value to offset zeroes for the purpose of log
 (default = 0.125)}
@@ -80,7 +81,7 @@ object (default = FALSE).}
 \item{progress}{Logical whether to display a progress bar}
 
 \item{...}{Other parameters to pass to
-\code{\link[lme4:glmer]{lme4::glmer()}}}
+\code{\link[lme4:glmer]{lme4::glmer}}}
 }
 \value{
 Returns a GlmmSeq object with results for gene-wise general linear

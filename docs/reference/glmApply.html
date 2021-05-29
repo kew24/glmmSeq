@@ -6,7 +6,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Glmm Sequencing qvalues — glmmQvals • glmmSeq</title>
+<title>Fit a glm model for an individual gene (no random effect) — glmApply • glmmSeq</title>
 
 <!-- favicons -->
 <link rel="icon" type="image/png" sizes="16x16" href="../favicon-16x16.png">
@@ -46,8 +46,8 @@
 
 
 
-<meta property="og:title" content="Glmm Sequencing qvalues — glmmQvals" />
-<meta property="og:description" content="Add qvalue columns to the glmmSeq dataframe" />
+<meta property="og:title" content="Fit a glm model for an individual gene (no random effect) — glmApply" />
+<meta property="og:description" content="Fit a glm model for an individual gene (no random effect)" />
 <meta property="og:image" content="/logo.png" />
 
 
@@ -135,78 +135,73 @@
 <div class="row">
   <div class="col-md-9 contents">
     <div class="page-header">
-    <h1>Glmm Sequencing qvalues</h1>
-    <small class="dont-index">Source: <a href='https://github.com/KatrionaGoldmann/glmmSeq/blob/master/R/glmmQvals.R'><code>R/glmmQvals.R</code></a></small>
-    <div class="hidden name"><code>glmmQvals.Rd</code></div>
+    <h1>Fit a glm model for an individual gene (no random effect)</h1>
+    <small class="dont-index">Source: <a href='https://github.com/KatrionaGoldmann/glmmSeq/blob/master/R/glmmSeq.R'><code>R/glmmSeq.R</code></a></small>
+    <div class="hidden name"><code>glmApply.Rd</code></div>
     </div>
 
     <div class="ref-description">
-    <p>Add qvalue columns to the glmmSeq dataframe</p>
+    <p>Fit a glm model for an individual gene (no random effect)</p>
     </div>
 
-    <pre class="usage"><span class='fu'>glmmQvals</span><span class='op'>(</span><span class='va'>glmmResult</span>, cutoff <span class='op'>=</span> <span class='fl'>0.05</span>, pi0 <span class='op'>=</span> <span class='cn'>NULL</span>, verbose <span class='op'>=</span> <span class='cn'>TRUE</span><span class='op'>)</span></pre>
+    <pre class="usage"><span class='fu'>glmApply</span><span class='op'>(</span>
+  <span class='va'>geneList</span>,
+  <span class='va'>fullFormula</span>,
+  <span class='va'>data</span>,
+  <span class='va'>control</span>,
+  <span class='va'>modelData</span>,
+  <span class='va'>designMatrix</span>,
+  <span class='va'>offset</span>,
+  <span class='va'>...</span>
+<span class='op'>)</span></pre>
 
     <h2 class="hasAnchor" id="arguments"><a class="anchor" href="#arguments"></a>Arguments</h2>
     <table class="ref-arguments">
     <colgroup><col class="name" /><col class="desc" /></colgroup>
     <tr>
-      <th>glmmResult</th>
-      <td><p>A glmmSeq object created by
-<code><a href='glmmSeq.html'>glmmSeq::glmmSeq()</a></code>.</p></td>
+      <th>geneList</th>
+      <td><p>List with gene expression and optional dispersion</p></td>
     </tr>
     <tr>
-      <th>cutoff</th>
-      <td><p>Prints a table showing the number of probes considered
-significant by the pvalue cut-off (default=0.05)</p></td>
+      <th>fullFormula</th>
+      <td><p>the model formula. For more information of formula
+structure see <code><a href='https://rdrr.io/r/stats/glm.html'>stats::glm</a></code></p></td>
     </tr>
     <tr>
-      <th>pi0</th>
-      <td><p>It is recommended not to input an estimate of pi0. Experienced
-users can use their own methodology to estimate the proportion of true nulls
-or set it equal to 1 for the BH procedure (default = NULL).</p></td>
+      <th>data</th>
+      <td><p>The sample data or metadata.</p></td>
     </tr>
     <tr>
-      <th>verbose</th>
-      <td><p>Logical whether to print the number of significant probes
-(default=TRUE)</p></td>
+      <th>control</th>
+      <td><p>the glm control (default = list()). For more information see
+<code><a href='https://rdrr.io/r/stats/glm.html'>stats::glm()</a></code>.</p></td>
+    </tr>
+    <tr>
+      <th>modelData</th>
+      <td><p>Expanded design matrix</p></td>
+    </tr>
+    <tr>
+      <th>designMatrix</th>
+      <td><p>The design matrix</p></td>
+    </tr>
+    <tr>
+      <th>offset</th>
+      <td><p>this can be used to specify an a priori known component to be
+included in the linear predictor during fitting. For more information see
+<code><a href='https://rdrr.io/r/stats/glm.html'>stats::glm()</a></code>.</p></td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td><p>Other parameters to pass to
+<code><a href='https://rdrr.io/r/stats/glm.html'>stats::glm()</a></code></p></td>
     </tr>
     </table>
 
     <h2 class="hasAnchor" id="value"><a class="anchor" href="#value"></a>Value</h2>
 
     <p>Returns a GlmmSeq object with results for gene-wise general linear
-mixed models with adjusted p-values using the qvalue function</p>
+mixed models</p>
 
-    <h2 class="hasAnchor" id="examples"><a class="anchor" href="#examples"></a>Examples</h2>
-    <pre class="examples"><div class='input'><span class='fu'><a href='https://rdrr.io/r/utils/data.html'>data</a></span><span class='op'>(</span><span class='va'>PEAC_minimal_load</span><span class='op'>)</span>
-<span class='va'>disp</span> <span class='op'>&lt;-</span> <span class='fu'><a href='https://rdrr.io/r/base/apply.html'>apply</a></span><span class='op'>(</span><span class='va'>tpm</span>, <span class='fl'>1</span>, <span class='kw'>function</span><span class='op'>(</span><span class='va'>x</span><span class='op'>)</span> <span class='op'>{</span>
-<span class='op'>(</span><span class='fu'><a href='https://rdrr.io/r/stats/cor.html'>var</a></span><span class='op'>(</span><span class='va'>x</span>, na.rm<span class='op'>=</span><span class='cn'>TRUE</span><span class='op'>)</span><span class='op'>-</span><span class='fu'><a href='https://rdrr.io/r/base/mean.html'>mean</a></span><span class='op'>(</span><span class='va'>x</span>, na.rm <span class='op'>=</span> <span class='cn'>TRUE</span><span class='op'>)</span><span class='op'>)</span><span class='op'>/</span><span class='op'>(</span><span class='fu'><a href='https://rdrr.io/r/base/mean.html'>mean</a></span><span class='op'>(</span><span class='va'>x</span>, na.rm <span class='op'>=</span> <span class='cn'>TRUE</span><span class='op'>)</span><span class='op'>**</span><span class='fl'>2</span><span class='op'>)</span>
-<span class='op'>}</span><span class='op'>)</span>
-<span class='va'>MS4A1glmm</span> <span class='op'>&lt;-</span> <span class='fu'><a href='glmmSeq.html'>glmmSeq</a></span><span class='op'>(</span><span class='op'>~</span> <span class='va'>Timepoint</span> <span class='op'>*</span> <span class='va'>EULAR_6m</span> <span class='op'>+</span> <span class='op'>(</span><span class='fl'>1</span> <span class='op'>|</span> <span class='va'>PATID</span><span class='op'>)</span>,
-                     id <span class='op'>=</span> <span class='st'>"PATID"</span>,
-                     countdata <span class='op'>=</span> <span class='va'>tpm</span><span class='op'>[</span><span class='fl'>1</span><span class='op'>:</span><span class='fl'>5</span>, <span class='op'>]</span>,
-                     metadata <span class='op'>=</span> <span class='va'>metadata</span>,
-                     dispersion <span class='op'>=</span> <span class='va'>disp</span><span class='op'>[</span><span class='fl'>1</span><span class='op'>:</span><span class='fl'>5</span><span class='op'>]</span>,
-                     verbose<span class='op'>=</span><span class='cn'>FALSE</span><span class='op'>)</span>
-</div><div class='output co'>#&gt; <span class='warning'>Warning: unable to evaluate scaled gradient</span></div><div class='output co'>#&gt; <span class='warning'>Warning: Model failed to converge: degenerate  Hessian with 1 negative eigenvalues</span></div><div class='output co'>#&gt; <span class='warning'>Warning: variance-covariance matrix computed from finite-difference Hessian is</span>
-#&gt; <span class='warning'>not positive definite or contains NA values: falling back to var-cov estimated from RX</span></div><div class='output co'>#&gt; <span class='warning'>Warning: variance-covariance matrix computed from finite-difference Hessian is</span>
-#&gt; <span class='warning'>not positive definite or contains NA values: falling back to var-cov estimated from RX</span></div><div class='output co'>#&gt; <span class='warning'>Warning: variance-covariance matrix computed from finite-difference Hessian is</span>
-#&gt; <span class='warning'>not positive definite or contains NA values: falling back to var-cov estimated from RX</span></div><div class='output co'>#&gt; <span class='warning'>Warning: Model failed to converge with max|grad| = 0.00870803 (tol = 0.002, component 1)</span></div><div class='input'><span class='va'>MS4A1glmm</span> <span class='op'>&lt;-</span> <span class='fu'>glmmQvals</span><span class='op'>(</span><span class='va'>MS4A1glmm</span>, pi0<span class='op'>=</span><span class='fl'>1</span><span class='op'>)</span>
-</div><div class='output co'>#&gt; 
-#&gt; q_Timepoint
-#&gt; -----------
-#&gt; Not Significant     Significant 
-#&gt;               2               3 
-#&gt; 
-#&gt; q_EULAR_6m
-#&gt; ----------
-#&gt; Not Significant     Significant 
-#&gt;               2               3 
-#&gt; 
-#&gt; q_Timepoint:EULAR_6m
-#&gt; --------------------
-#&gt; Not Significant     Significant 
-#&gt;               3               2 </div></pre>
   </div>
   <div class="col-md-3 hidden-xs hidden-sm" id="pkgdown-sidebar">
     <nav id="toc" data-toggle="toc" class="sticky-top">
